@@ -1,7 +1,5 @@
 import os
 
-from flaskr.auth import token_required
-
 from flask import Flask, jsonify, request
 
 def create_app(test_config=None):
@@ -26,5 +24,8 @@ def create_app(test_config=None):
 
     from . import auth
     app.register_blueprint(auth.construct_blueprint(app))
+
+    from . import user
+    app.register_blueprint(user.construct_blueprint(app))
 
     return app
