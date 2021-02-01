@@ -2,7 +2,7 @@ from flask import Blueprint, flash, g, request, jsonify
 from flaskr.db import get_db
 from werkzeug.security import check_password_hash, generate_password_hash
 from sqlite3 import Error as SQLiteError
-from jwt import DecodeError, encode as jwt_encode, decode as jwt_decode
+from jwt import DecodeError, encode as jwt_encode, decode as jwt_decode, ExpiredSignatureError
 from functools import wraps
 
 valid_body_keys = ("username", "password", "confirm_password")
@@ -32,6 +32,8 @@ def token_required(app):
                 current_user = user_by_username(username=data['username'])
             except DecodeError:
                 return jsonify({'message': 'token is invalid or expired', 'data': []}), 401
+            except ExpiredSignatureError:
+                return jsonify({'message': 'token is expired', 'data': []}), 401
             
             return f(current_user, *args, **kwargs)
         return decorated
@@ -132,7 +134,7 @@ def construct_blueprint(app):
 
     @bp.route('/<int:id>', methods=['GET'])
     @token_required(app)
-    def get_user(id):
+    def get_user(current_user,id):
         db = get_db()
         user = db.execute(query_user_by_id, (id,)).fetchone()
 
@@ -143,7 +145,7 @@ def construct_blueprint(app):
     
     @bp.route('/list', methods=['GET'])
     @token_required(app)
-    def list_users():
+    def list_users(current_user):
         db = get_db()
         users = db.execute('SELECT id, username, password FROM user')
 
