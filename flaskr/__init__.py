@@ -28,4 +28,7 @@ def create_app(test_config=None):
     from . import user
     app.register_blueprint(user.construct_blueprint(app))
 
+    from . import panel
+    app.register_blueprint(panel.construct_blueprint(app))
+
     return app
