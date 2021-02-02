@@ -7,6 +7,8 @@ def construct_blueprint(app):
 
     bp = Blueprint('panel', __name__, url_prefix='/panel')
 
+    message_invalid_request = "invalid request provided"
+
     @bp.route("/", methods=["POST"])
     @token_required(app)
     def register_panel(current_user):
@@ -32,7 +34,7 @@ def construct_blueprint(app):
             except SQLiteError:
                 return jsonify({"message": "an error occured during register proccess"}), 500
         
-        return jsonify({"message": "invalid request provided"}), 400
+        return jsonify({"message": message_invalid_request}), 400
 
     @bp.route("/", methods=["GET"])
     @token_required(app)
@@ -50,7 +52,6 @@ def construct_blueprint(app):
             } for panel in panels], "count": len(panels)})
         except SQLiteError:
             return jsonify({"message": "an error occured during panel list"}), 500
-
 
     @bp.route("<int:panel_id>/cards")
     @token_required(app)
@@ -107,5 +108,80 @@ def construct_blueprint(app):
             except SQLiteError:
                 return jsonify({"message": "an error occured during card register proccess"}), 500
                 
-        return jsonify({"message": "invalid request provided"}), 400
+        return jsonify({"message": message_invalid_request}), 400
+
+    @bp.route("<int:panel_id>/cards/<int:card_id>", methods=["PUT"])
+    @token_required(app)
+    def update_panel_card(current_user, panel_id, card_id):
+        db = get_db()
+
+        request_body = request.get_json()
+
+        valid_body_keys = ("title", "coord_x", "coord_y", "width", "height")
+
+        if all (k in valid_body_keys for k in request_body):
+            title, coord_x, coord_y, width, height = request_body["title"], request_body["coord_x"], request_body["coord_y"], request_body["width"], request_body["height"]
+
+            try:
+                cursor = db.cursor()
+
+                cursor.execute("""
+                    UPDATE panel_card 
+                    SET 
+                        title = ?, 
+                        coord_x = ?, 
+                        coord_y = ?, 
+                        width = ?, 
+                        height = ? 
+                    WHERE panel_id = ?
+                    """, (title, coord_x, coord_y, width, height, panel_id))
+                db.commit()
+
+                return jsonify({
+                        "message": "the card was successfully updated",
+                        "data": {
+                            "_id": card_id,
+                            "title": title,
+                            "coord_x": coord_x,
+                            "coord_y": coord_y,
+                            "width": width,
+                            "height": height
+                        }
+                    }), 202
+            except SQLiteError:
+                return jsonify({"message": "an error occured during card update proccess"}), 500
+                
+            
+        return jsonify({"message": message_invalid_request}), 400
+
+    @bp.route("<int:panel_id>/cards/<int:card_id>", methods=["DELETE"])
+    @token_required(app)
+    def delete_panel_card(current_user, panel_id, card_id):
+        db = get_db()
+
+        try:
+            cursor = db.cursor()
+
+            panel_card = cursor.execute("SELECT * FROM panel_card WHERE panel_id = ? AND id = ?", (panel_id, card_id,)).fetchone()
+
+            if panel_card is None:
+                return jsonify({"message": f"the card with id {card_id} don't exist in panel with id {panel_id}!", }), 404
+
+            cursor.execute("DELETE FROM panel_card WHERE panel_id = ? AND id = ?", (panel_id, card_id,))
+            db.commit()
+
+            return jsonify({
+                    "message": "the card was successfully deleted!",
+                    "data": {
+                        "_id": panel_card["id"],
+                        "title": panel_card["title"],
+                        "coord_x": panel_card["coord_x"],
+                        "coord_y": panel_card["coord_y"],
+                        "width": panel_card["width"],
+                        "height": panel_card["height"]
+                    }
+                }), 202
+        except SQLiteError:
+            return jsonify({"message": "an error occured during card delete proccess"}), 500
+
     return bp
